@@ -2,6 +2,24 @@
 # Created by https://www.toptal.com/developers/gitignore/api/linux,visualstudiocode,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=linux,visualstudiocode,python
 
+<<<<<<< HEAD
+=======
+## Wandb ###
+*.swp
+.python-version
+wandb
+wandb-debug.log
+__pycache__
+.ipynb_checkpoints
+.DS_Store
+logs
+summary*
+run*
+# Added acoording to https://github.com/wandb/examples/blob/master/.gitignore
+*.tar
+# Added on my own
+
+>>>>>>> 950b7c1fabec0f1408af2d5ba8ec6ea86d83d7f5
 ### Linux ###
 *~
 
@@ -193,4 +211,7 @@ cython_debug/
 # Support for Project snippet scope
 
 # End of https://www.toptal.com/developers/gitignore/api/linux,visualstudiocode,python
+<<<<<<< HEAD
 
+=======
+>>>>>>> 950b7c1fabec0f1408af2d5ba8ec6ea86d83d7f5
