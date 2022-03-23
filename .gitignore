@@ -2,6 +2,21 @@
 # Created by https://www.toptal.com/developers/gitignore/api/linux,visualstudiocode,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=linux,visualstudiocode,python
 
+## Wandb ###
+*.swp
+.python-version
+wandb
+wandb-debug.log
+__pycache__
+.ipynb_checkpoints
+.DS_Store
+logs
+summary*
+run*
+# Added acoording to https://github.com/wandb/examples/blob/master/.gitignore
+*.tar
+# Added on my own
+
 ### Linux ###
 *~
 
