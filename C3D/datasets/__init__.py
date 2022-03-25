@@ -4,7 +4,7 @@ from torch.utils.data.dataloader import default_collate
 import math
 
 class UCF101Dataset(Dataset):
-    def __init__(self, ucf_folder, split, split_num, resize_width, resize_height, crop_size, clip_len, sampling, use_vr):
+    def __init__(self, ucf_folder, split, split_num, resize_width, resize_height, crop_size, clip_len, sampling, normalize_type):
         super(UCF101Dataset, self)
         self.video_folder = Path(ucf_folder) / 'video'
         self.split = split
@@ -13,6 +13,15 @@ class UCF101Dataset(Dataset):
 
         self.video_list = []
         self.label_list = []
+        self.label_to_num = dict()
+        
+        with open ('/data5/datasets/ucf101/annotation/classInd.txt', 'r') as f:
+            for line in f:
+                num, label = line.split()
+                self.label_to_num[label] = int(num) - 1
+        f.close()
+        print(self.label_to_num)
+
         for split_txt_path in split_txt_paths:
             with open(split_txt_path, 'r') as f:
                 for line in f:
@@ -20,13 +29,19 @@ class UCF101Dataset(Dataset):
                         video_name, label_name = line.split()
                         self.video_list.append(video_name)
                         self.label_list.append(int(label_name)-1) # to make label list in range(0,101)
+                    elif self.split == 'test':
+                        #import pdb;pdb.set_trace()
+                        video_name= line.rstrip()
+                        self.video_list.append(video_name)
+                        self.label_list.append(self.label_to_num[(video_name.split('/'))[0]]) # to make label list in range(0,101)
             f.close()
+
         self.resize_width = resize_width
         self.resize_height = resize_height
         self.crop_size = crop_size
         self.clip_len = clip_len
         self.sampling = sampling
-        self.use_vr = use_vr
+        self.normalize_type = normalize_type
     
     def __len__(self):
         return len(self.video_list)
@@ -35,40 +50,34 @@ class UCF101Dataset(Dataset):
         video_path = os.path.join(self.video_folder, self.video_list[idx])
         label = np.array(self.label_list[idx])
 
-        if self.use_vr :
-            torch_buffer = self.vr_getitem(video_path)
-        else:
-            if self.sampling == 'freq4_all_center':
-                buffer = self.load_resized_frames(video_path) #uint8
-                buffer = self.all_center_crop(buffer)
-            elif self.sampling == 'uniform_center':
-                buffer = self.uniform_load_resized_frames(video_path) #uint8
-                buffer = self.center_crop(buffer)
-            elif self.sampling == 'uniform_random': # random
-                buffer = self.uniform_load_resized_frames(video_path)
-                buffer = self.random_crop(buffer)
-            elif self.sampling == 'freq4_all_random':
-                buffer = self.load_resized_frames(video_path)
-                buffer = self.all_random_crop(buffer)
-            
-            if self.split == 'train':
-                if np.random.random() < 0.5:
-                    for i, frame in enumerate(buffer):
-                        frame = cv.flip(buffer[i], flipCode=1) # (h,w,c)
-                        buffer[i] = frame
-            buffer = buffer.astype(np.float32)
+        if self.sampling == 'freq4_all_center':
+            buffer = self.load_resized_frames(video_path) #uint8
+            buffer = self.all_center_crop(buffer)
+        elif self.sampling == 'uniform_center':
+            buffer = self.uniform_load_resized_frames(video_path) #uint8
+            buffer = self.center_crop(buffer)
+        elif self.sampling == 'uniform_random': # random
+            buffer = self.uniform_load_resized_frames(video_path)
+            buffer = self.random_crop(buffer)
+        elif self.sampling == 'freq4_all_random':
+            buffer = self.load_resized_frames(video_path)
+            buffer = self.all_random_crop(buffer)
+        
+        if self.split == 'train':
+            if np.random.random() < 0.5:
+                for i, frame in enumerate(buffer):
+                    frame = cv.flip(buffer[i], flipCode=1) # (h,w,c)
+                    buffer[i] = frame
+        buffer = buffer.astype(np.float32)
 
+        normalize_type = 'imagenet'
+        if normalize_type == 'imagenet':
             for i, frame in enumerate(buffer):
                 frame = frame / 255.0 # (h,w,c)
                 buffer[i] = frame
             
             # buffer : (32, 112, 112, 3) 
             buffer = buffer.transpose((3, 0, 1, 2)) # (3, 32, 112, 112)
-
-            #normalize = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-
-            # frame = (frame - mean)/std
-                # (3, 32, 112, 112)
             
             channel_order = 'bgr'
 
@@ -84,9 +93,39 @@ class UCF101Dataset(Dataset):
             for i, channel in enumerate(torch_buffer):
                 normalized_channel = (channel - mean[i])/std[i]
                 torch_buffer[i] = normalized_channel
+            
+            torch_label = torch.from_numpy(label)
+        elif normalize_type == 'ucf101':
+            # 'bgr'
+            mean = [90.0, 98.0, 102.0]
+
+            for i, frame in enumerate(buffer):
+                frame = frame.transpose((2,0,1))
+                # (c, h, w)
+                for j, channel in enumerate(frame):
+                    normalized_channel = (channel - mean[j])
+                    frame[j] = normalized_channel
+                frame = frame.transpose((1,2,0))
+                # (h, w, c)
+                frame = frame / 255.0
+                buffer[i] = frame
+            print(buffer.shape, buffer.sum(), buffer.min(), buffer.max(), np.average(buffer))
+            # (16, 112, 112, 3) 207597.94 0.003921569 1.0 0.34478292
+
+            buffer = buffer.transpose((3, 0, 1, 2)) # (3, 32, 112, 112)
+            print(buffer.shape, buffer.sum(), buffer.min(), buffer.max(), np.average(buffer))
+            # (3, 16, 112, 112) 207597.94 0.003921569 1.0 0.34478292
+
+            torch_buffer = torch.from_numpy(buffer)
+            torch_label = torch.from_numpy(label)
+            # torch.Size([3, 16, 112, 112]) tensor(-277394.5938) tensor(-2.1008) tensor(2.6400) tensor(-0.4607)
+            # out_label : tensor(0)
+
+            print(torch_buffer.shape, torch_label.shape)
+
         
         # print(self.video_list[idx], label)
-        return torch_buffer, torch.from_numpy(label)
+        return torch_buffer, torch_label
 ######################################################
     def vr_getitem(self, video_path):
 
@@ -377,4 +416,3 @@ class UCF101Dataset(Dataset):
 def collate_wrapper(batch):
     batch = list(filter(lambda x: x[0] is not None, batch))
     return default_collate(batch)
-    

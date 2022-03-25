@@ -35,6 +35,9 @@ def load_checkpoint(checkpoint_path, model, optimizer, device):
     del checkpoint
     return model, optimizer, start_epoch
 
-def save_checkpoint(epoch, model, optimizer, loss, ckpt_file_path):
-    state = {'epoch': epoch, 'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'loss': loss}
+def save_checkpoint(epoch, model, optimizer, scheduler, loss, ckpt_file_path):
+    if scheduler == None:
+        state = {'epoch': epoch, 'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'loss': loss}
+    else :
+        state = {'epoch': epoch, 'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'scheduler': scheduler.state_dict(), 'loss': loss}
     torch.save(state, ckpt_file_path)

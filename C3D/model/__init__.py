@@ -30,7 +30,6 @@ class C3DNet(nn.Module):
 
         self.relu = nn.ReLU(inplace=True)
         self.dropout = nn.Dropout()
-        self.softmax = nn.Softmax(dim = 1)
 
         self.__init_weight()
 
@@ -45,7 +44,6 @@ class C3DNet(nn.Module):
         out = out.view(-1,8192)
         out = self.dropout(self.relu(self.fc7(self.dropout(self.relu(self.fc6(out))))))
         out = self.fc8(out)
-        out = self.softmax(out)
 
         return out
     
