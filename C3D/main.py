@@ -7,11 +7,6 @@ import argparse
 
 ckpt = None
 epochs = 400
-#batch_size = 100
-#lr = 0.005
-#use_bn = False
-#dropout_p = 0.5
-#clips_per_video = 1
 workers = 8
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 ucf_folder = '/data5/datasets/ucf101'
@@ -26,7 +21,7 @@ def train_and_val(model, train_data_loader, valid_data_loader):
         optimizer = optim.SGD(model.parameters(), lr = args.learning_rate, momentum = 0.9, weight_decay = 5e-4)
     elif args.optimizer_type == 'Adam':
         optim_configs = [{'params': model.parameters(), 'lr': args.learning_rate}]
-        optimizer = optim.Adam(optim_configs, lr=args.learning_rate, weight_decay=5e-4) # lr = 1e-4
+        optimizer = optim.Adam(optim_configs, lr=args.learning_rate, weight_decay=5e-4)
     elif args.optimizer_type =='SGD_params':
         train_params = [{'params': get_1x_lr_params(model), 'lr': args.learning_rate},
                 {'params': get_10x_lr_params(model), 'lr': args.learning_rate * 10}]
@@ -42,7 +37,6 @@ def train_and_val(model, train_data_loader, valid_data_loader):
     
     with torch.autograd.set_detect_anomaly(True):
         for epoch in tqdm(range(epochs)):
-            #epoch_correct = 0.0
             model.train()
             train_loss = 0.0
             train_corrects = 0.0
@@ -50,34 +44,23 @@ def train_and_val(model, train_data_loader, valid_data_loader):
                 X, y = data
                 X = X.to(device) 
                 y = y.to(device)
-                # import pdb;pdb.set_trace()
                 optimizer.zero_grad()
-                ##import pdb;pdb.set_trace()
 
-                if args.use_softmax:
-                    output = model(X)
-                    softmax_fn = nn.Softmax(dim = 1)
-                    output = softmax_fn(output) # grad_fn=<SoftmaxBackward>
-                else:
-                    output = model(X) # grad_fn=<AddmmBackward> 
+                output = model(X)
 
-                loss = loss_fn(output, y) # 4.6184 # 기존
+                loss = loss_fn(output, y)
 
-                loss.backward() # cross entropy loss -> logits
+                loss.backward()
                 optimizer.step()
 
                 pred = torch.argmax(output, dim = 1)
-                # epoch_correct += (pred == y).sum().item()
                 train_loss += loss.item() * (X.shape)[0]
-                # loss.item() : 4.618359565734863, X.shape[0] = 20
                 train_corrects += torch.sum(pred == y)
                 del X
                 del y
             
-            
-            # acc = 100 * epoch_correct / (len(train_data_loader) * args.batch_size)
-            train_epoch_loss = train_loss / len(train_data_loader.dataset) # 19123
-            train_epoch_acc = 100* train_corrects.double() / len(train_data_loader.dataset) # 19123
+            train_epoch_loss = train_loss / len(train_data_loader.dataset)
+            train_epoch_acc = 100* train_corrects.double() / len(train_data_loader.dataset)
             print('Train Epoch: {}, Acc: {:.6f}, Loss: {:.6f}'.format(epoch, train_epoch_acc, train_epoch_loss))
             
             if epoch == 0:
@@ -94,7 +77,6 @@ def train_and_val(model, train_data_loader, valid_data_loader):
                     save_checkpoint(epoch, model, optimizer, scheduler, loss, ckpt_file_path)
             
             model.eval()
-            #val_corrects = 0.0
             with torch.no_grad():
                 val_loss = 0.0
                 val_corrects = 0.0
@@ -103,17 +85,11 @@ def train_and_val(model, train_data_loader, valid_data_loader):
                     val_X = val_X.to(device)
                     val_y = val_y.to(device)
 
-                    if args.use_softmax:
-                        val_output = model(val_X)
-                        softmax_fn = nn.Softmax(dim = 1)
-                        val_output = softmax_fn(val_output) # grad_fn=<SoftmaxBackward>
-                    else:
-                        val_output = model(val_X)
+                    val_output = model(val_X)
                     
-                    val_loss_out = loss_fn(val_output, val_y) # include softmax
+                    val_loss_out = loss_fn(val_output, val_y)
                     val_loss += val_loss_out.item() * (val_X.shape)[0]
                     val_pred = torch.argmax(val_output, dim = 1)
-                    # val 은 여기서 Softmax 를 한 번 더 해줬음 -> 250에서 그래서 안됐던거
                     val_corrects += torch.sum(val_pred == val_y)
                     del val_X
                     del val_y
@@ -147,8 +123,7 @@ def main(args):
       "step_size" : args.step_size,
       "sampling" : args.sampling,
       "scheduler" : args.scheduler,
-      "normalize_type" : args.normalize_type,
-      "use_softmax" : args.use_softmax
+      "normalize_type" : args.normalize_type
     }
 
     seed_everything()
@@ -193,31 +168,19 @@ def check_dataset(train_dataset, valid_dataset):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train C3D with UCF101')
 
-    # 0323 setting
     parser.add_argument('--batch_size', default= 20, type=int)
     parser.add_argument('--resize_width', default = 171, type=int)
     parser.add_argument('--resize_height', default = 128, type=int)
     parser.add_argument('--crop_size', default = 112, type=int)
     parser.add_argument('--clip_len', default = 16, type=int)
     parser.add_argument('--optimizer_type', default='SGD', type=str, choices=['SGD', 'Adam', 'SGD_params'])
-    parser.add_argument('--channel_order', default='bgr', type=str)
     
     parser.add_argument('--learning_rate', default=0.005, type=float)
     parser.add_argument('--step_size', default=20, type=int)
     parser.add_argument('--scheduler', default = 'no', type = str, choices = ['step', 'reduce', 'no'])
 
-    # uniform random 이 나을듯?
     parser.add_argument('--sampling', default='uniform_random', type=str, choices=['freq4_all_center', 'freq4_all_random', 'uniform_center', 'uniform_random'])
     parser.add_argument('--normalize_type', default = 'imagenet', type = str, choices = ['imagenet', 'ucf101'])
 
-    parser.add_argument('--use_softmax', default = False, type = bool)
-    # OMP_NUM_THREADS=1 CUDA_VISIBLE_DEVICES='2' python main.py --learning_rate 0.005 --scheduler 'step' --step_size 10 
-
-
-    # OMP_NUM_THREADS=1 CUDA_VISIBLE_DEVICES='6' python main.py --scheduler 'step' --step_size 20 --learning_rate 0.001 --sampling 'uniform_random' --use_softmax True
-    # OMP_NUM_THREADS=1 CUDA_VISIBLE_DEVICES='6' python main.py --scheduler 'no' --step_size 200 --learning_rate 0.001
-    # OMP_NUM_THREADS=1 CUDA_VISIBLE_DEVICES='7' python main.py --scheduler 'no' --step_size 100 --learning_rate 0.001 --scheduler 'step' --sampling 'uniform_center'
-    
-    # OMP_NUM_THREADS=1 CUDA_VISIBLE_DEVICES='6' python main.py --scheduler 'step' --step_size 20 --learning_rate 0.005 --sampling uniform_random --use_softmax True
     args = parser.parse_args()
     main(args)
