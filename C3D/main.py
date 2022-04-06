@@ -211,6 +211,9 @@ if __name__ == "__main__":
     parser.add_argument('--normalize_type', default = 'imagenet', type = str, choices = ['imagenet', 'ucf101'])
 
     parser.add_argument('--use_softmax', default = False, type = bool)
+    # OMP_NUM_THREADS=1 CUDA_VISIBLE_DEVICES='2' python main.py --learning_rate 0.005 --scheduler 'step' --step_size 10 
+
+
     # OMP_NUM_THREADS=1 CUDA_VISIBLE_DEVICES='6' python main.py --scheduler 'step' --step_size 20 --learning_rate 0.001 --sampling 'uniform_random' --use_softmax True
     # OMP_NUM_THREADS=1 CUDA_VISIBLE_DEVICES='6' python main.py --scheduler 'no' --step_size 200 --learning_rate 0.001
     # OMP_NUM_THREADS=1 CUDA_VISIBLE_DEVICES='7' python main.py --scheduler 'no' --step_size 100 --learning_rate 0.001 --scheduler 'step' --sampling 'uniform_center'

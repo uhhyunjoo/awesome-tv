@@ -2,8 +2,6 @@
 # Created by https://www.toptal.com/developers/gitignore/api/linux,visualstudiocode,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=linux,visualstudiocode,python
 
-<<<<<<< HEAD
-=======
 ## Wandb ###
 *.swp
 .python-version
@@ -19,7 +17,6 @@ run*
 *.tar
 # Added on my own
 
->>>>>>> 950b7c1fabec0f1408af2d5ba8ec6ea86d83d7f5
 ### Linux ###
 *~
 
